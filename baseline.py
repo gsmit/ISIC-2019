@@ -168,16 +168,17 @@ df_test['image'] = file_list
 df_test['path'] = str(test_images) + '\\' + df_test['image']
 df_test['class'] = ['N.A.' for i in range(len(df_test))]
 
-test_generator = valid_augment.flow_from_dataframe(
+test_augment = ImageDataGenerator(rescale=1./255)
+
+test_generator = test_augment.flow_from_dataframe(
     dataframe=df_test,
     directory=None,
     x_col="path",
     y_col='class',
-    classes=classes[:-1],
     target_size=(img_size, img_size),
-    batch_size=1,
+    shuffle=False,
     class_mode='categorical',
-    validate_filenames=True)
+    batch_size=1)
 
 file_names = test_generator.filenames
 num_samples = len(file_names)
