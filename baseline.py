@@ -9,7 +9,7 @@ import seaborn as sns
 from os import listdir
 from os.path import isfile, join
 from pathlib import Path
-from metric import balanced_accuracy
+from metric import balanced_accuracy, categorical_focal_loss
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
@@ -55,6 +55,10 @@ class_weights_list = class_weight.compute_class_weight(
     'balanced', [i for i in range(num_classes)], y_train_int)
 class_weights = {v: k for v, k in enumerate(class_weights_list)}
 
+# print(len(df_train))
+# print(df_train['class'].value_counts())
+# print(class_weights)
+
 # specify input
 img_size = 240
 channels = 3
@@ -67,30 +71,36 @@ learning_rate = 1e-4
 
 # loading pre-trained conv base model
 base = efn.EfficientNetB1(weights="imagenet", include_top=False, input_shape=(img_size, img_size, channels))
-dropout = 0.2
+
 model = Sequential()
 model.add(base)
 model.add(GlobalAveragePooling2D(name="gap"))
-model.add(Dropout(dropout, name="dropout_out"))
+model.add(Dropout(0.2, name="dropout_out"))
 model.add(Dense(num_classes, activation="softmax"))
 base.trainable = True
 
 
 # callbacks
-def scheduler(epoch):
-    if epoch < 2:
+def drop_decay(epoch):
+    drop = 0.5
+    epochs_drop = 5.0
+    return learning_rate * tf.math.pow(drop, tf.math.floor((1 + epoch) / epochs_drop))
+
+
+def exp_decay(epoch):
+    if epoch < 10:
         return learning_rate
     else:
-        return learning_rate * 0.2
+        return learning_rate * tf.math.exp(0.1 * (10 - epoch))
 
 
-lr_scheduler = LearningRateScheduler(scheduler, verbose=1)
+lr_scheduler = LearningRateScheduler(drop_decay, verbose=1)
 early_stopping = EarlyStopping(monitor='val_loss', patience=4, verbose=1)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-8, verbose=1)
 
 # training
 model.compile(
-    loss='categorical_crossentropy',
+    loss=categorical_focal_loss(gamma=2.0, alpha=0.25),
     optimizer=Adam(lr=learning_rate),
     metrics=[balanced_accuracy(num_classes), 'accuracy'])
 
@@ -131,15 +141,15 @@ valid_generator = valid_augment.flow_from_dataframe(
 history = model.fit(
     train_generator,
     steps_per_epoch=train_steps,
-    epochs=16,
-    callbacks=[early_stopping],
-    class_weight=class_weights,
+    epochs=25,
+    callbacks=[lr_scheduler],
+    class_weight=None,
     validation_data=valid_generator,
     validation_steps=valid_steps,
     verbose=2)
 
 # save model
-model_out = model_path / 'efficient-net-b1-baseline.h5'
+model_out = model_path / 'efficient-net-b1-baseline-v3.h5'
 model.save(str(model_out))
 print(f'Saved model to: {str(model_out)}')
 
@@ -180,9 +190,13 @@ test_generator = test_augment.flow_from_dataframe(
     class_mode='categorical',
     batch_size=1)
 
+# make submission
 file_names = test_generator.filenames
 num_samples = len(file_names)
-predictions = model.predict(test_generator, steps=num_samples)
+y_pred = model.predict_generator(test_generator, steps=num_samples)
+label_map = valid_generator.class_indices
+predictions = pd.DataFrame(y_pred, columns=label_map.keys())
+predictions = predictions[classes[:-1]]
 
 images = [f.rstrip('.jpg') for f in file_list]
 df_image = pd.DataFrame(file_list, columns=['image'])
@@ -190,18 +204,20 @@ df_preds = pd.DataFrame(predictions, columns=classes[:-1])
 submission = pd.concat([df_image, df_preds], axis=1).reset_index(drop=True)
 submission['UNK'] = 0.0
 submission['UNK'] = submission['UNK'].astype(float)
+submission.to_csv(str(submission_path) + '\\efficient-net-b1-baseline-v3.csv', index=False)
 
-# class_prob = submission[classes].values
-# class_max = np.max(class_prob, axis=1)
-# class_unk = np.where(class_max < 0.5, 1.0, 0.0)
-# submission['UNK'] = class_unk
-# submission['MEL'] = np.where(submission['UNK'] == 1.0, 0.0, submission['MEL'])
-# submission['NV'] = np.where(submission['UNK'] == 1.0, 0.0, submission['NV'])
-# submission['BCC'] = np.where(submission['UNK'] == 1.0, 0.0, submission['BCC'])
-# submission['AK'] = np.where(submission['UNK'] == 1.0, 0.0, submission['AK'])
-# submission['BKL'] = np.where(submission['UNK'] == 1.0, 0.0, submission['BKL'])
-# submission['DF'] = np.where(submission['UNK'] == 1.0, 0.0, submission['DF'])
-# submission['VASC'] = np.where(submission['UNK'] == 1.0, 0.0, submission['VASC'])
-# submission['SCC'] = np.where(submission['UNK'] == 1.0, 0.0, submission['SCC'])
+# post-processing
+class_prob = submission[classes].values
+class_max = np.max(class_prob, axis=1)
+class_unk = np.where(class_max < 0.4, 1.0, 0.0)
+submission['UNK'] = class_unk
+submission['MEL'] = np.where(submission['UNK'] == 1.0, 0.0, submission['MEL'])
+submission['NV'] = np.where(submission['UNK'] == 1.0, 0.0, submission['NV'])
+submission['BCC'] = np.where(submission['UNK'] == 1.0, 0.0, submission['BCC'])
+submission['AK'] = np.where(submission['UNK'] == 1.0, 0.0, submission['AK'])
+submission['BKL'] = np.where(submission['UNK'] == 1.0, 0.0, submission['BKL'])
+submission['DF'] = np.where(submission['UNK'] == 1.0, 0.0, submission['DF'])
+submission['VASC'] = np.where(submission['UNK'] == 1.0, 0.0, submission['VASC'])
+submission['SCC'] = np.where(submission['UNK'] == 1.0, 0.0, submission['SCC'])
 
-submission.to_csv(str(submission_path) + '\\efficient-net-b1-baseline-2.csv', index=False)
+submission.to_csv(str(submission_path) + '\\efficient-net-b1-baseline-v3-post-processing.csv', index=False)
