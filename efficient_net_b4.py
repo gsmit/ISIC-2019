@@ -107,7 +107,19 @@ model.compile(
     metrics=[balanced_accuracy(num_classes), 'accuracy'])
 
 # augmentations
-augmentations = A.Compose([
+augmentations_light = A.Compose([
+    # color adjustment
+    A.RandomBrightnessContrast(p=0.4),
+
+    # rotations and flips
+    A.RandomRotate90(p=0.6),
+    A.VerticalFlip(p=0.6),
+
+    # miscellaneous
+    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, interpolation=1, approximate=False, p=0.2),
+])
+
+augmentations_heavy = A.Compose([
     # resize for constant augmentations
     A.Resize(height=600, width=600, p=1.0),
 
@@ -136,14 +148,14 @@ augmentations = A.Compose([
 
 train_datagen = ImageDataAugmentor(
     rescale=1.0/255,
-    augment=augmentations,
+    augment=augmentations_light,
     preprocess_input=None)
 
 valid_datagen = ImageDataAugmentor(rescale=1.0/255)
 
 test_datagen = ImageDataAugmentor(
     rescale=1.0/255,
-    augment=augmentations,
+    augment=augmentations_light,
     preprocess_input=None)
 
 train_generator = train_datagen.flow_from_dataframe(
