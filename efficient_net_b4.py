@@ -151,6 +151,8 @@ train_datagen = ImageDataAugmentor(
     augment=augmentations_light,
     preprocess_input=None)
 
+
+
 valid_datagen = ImageDataAugmentor(rescale=1.0/255)
 
 test_datagen = ImageDataAugmentor(
