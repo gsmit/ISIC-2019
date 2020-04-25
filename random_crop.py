@@ -65,7 +65,8 @@ def load_and_crop_image(path, grayscale=False, color_mode='rgb', target_size=Non
                 img = img.crop((left_shift, down_shift, target_width + left_shift, target_height + down_shift))
 
             elif crop == 'fixed':
-                crop_size = 405  # max size is 450
+                # max size is 450
+                crop_size = 432  # default is 405
                 x, y = img.size
                 w_range = x - crop_size
                 h_range = y - crop_size
