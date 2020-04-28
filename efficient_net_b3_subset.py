@@ -106,15 +106,6 @@ base = efn.EfficientNetB3(weights='imagenet', include_top=False, input_shape=(im
 base.trainable = True
 base.summary()
 
-# freeze some layers
-# for i, layer in enumerate(base.layers):
-#     if i <= 68:
-#         layer.trainable = False
-#         print(f'Not-trainable: {i}: {layer.name}')
-#     else:
-#         layer.trainable = True
-#         print(f'Trainable: {i}: {layer.name}')
-
 model = Sequential()
 model.add(base)
 model.add(GlobalAveragePooling2D(name='gap'))
