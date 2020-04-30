@@ -33,7 +33,7 @@ print(device_lib.list_local_devices())
 
 # settings
 model_name = 'b3'
-version = 'v4-subset'
+version = 'v5-subset'
 
 # plotting settings
 sns.set_style('whitegrid')
@@ -63,7 +63,7 @@ for skin_class in classes:
     num_samples = 4000
     if down_sampling:
         if len(data_frame) > num_samples:
-            data_frame = data_frame.sample(n=num_samples, random_state=2020)
+            data_frame = data_frame.sample(n=num_samples, random_state=24)
 
     tables.append(data_frame)
 
@@ -76,7 +76,7 @@ train_labels = pd.concat([train_labels, class_dummies.reindex(train_labels.index
 # validation split
 X_train, X_valid, y_train, y_valid = train_test_split(
     train_labels[['path', 'class']], train_labels[classes],
-    stratify=train_labels['class'].values, shuffle=True, test_size=0.2, random_state=28)
+    stratify=train_labels['class'].values, shuffle=True, test_size=0.2, random_state=24)
 df_train = pd.concat([X_train, y_train], axis=1).reset_index(drop=True)
 df_valid = pd.concat([X_valid, y_valid], axis=1).reset_index(drop=True)
 y_train, y_valid = y_train.values, y_valid.values
