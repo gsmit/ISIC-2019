@@ -33,7 +33,7 @@ print(device_lib.list_local_devices())
 
 # settings
 model_name = 'b4'
-version = 'v3-pseudo'
+version = 'v10-pseudo'
 
 # plotting settings
 sns.set_style('whitegrid')
@@ -67,7 +67,7 @@ for skin_class in classes:
     num_samples = 6000
     if down_sampling:
         if len(data_frame) > num_samples:
-            data_frame = data_frame.sample(n=num_samples, random_state=42)
+            data_frame = data_frame.sample(n=num_samples, random_state=123)
 
     tables.append(data_frame)
 
@@ -89,7 +89,7 @@ train_labels = pd.concat([train_labels, class_dummies.reindex(train_labels.index
 # validation split
 X_train, X_valid, y_train, y_valid = train_test_split(
     train_labels[['path', 'class']], train_labels[classes],
-    stratify=train_labels['class'].values, shuffle=True, test_size=0.2, random_state=42)
+    stratify=train_labels['class'].values, shuffle=True, test_size=0.2, random_state=123)
 df_train = pd.concat([X_train, y_train], axis=1).reset_index(drop=True)
 df_valid = pd.concat([X_valid, y_valid], axis=1).reset_index(drop=True)
 y_train, y_valid = y_train.values, y_valid.values
@@ -140,7 +140,7 @@ reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr
 
 # compilation
 model.compile(
-    loss=categorical_focal_loss(gamma=2.0, alpha=0.25),
+    loss=categorical_focal_loss(gamma=1.5, alpha=0.5),
     optimizer=Adam(lr=learning_rate),
     metrics=[balanced_accuracy(num_classes), 'accuracy'])
 
@@ -290,9 +290,9 @@ test_generator = train_datagen.flow_from_dataframe(
     x_col="path",
     y_col='class',
     target_size=(img_size, img_size),
-    shuffle=False,
-    class_mode='categorical',
-    batch_size=batch_size)
+    interpolation='bicubic:fixed',
+    batch_size=batch_size,
+    class_mode='categorical')
 
 # make submission
 label_map = valid_generator.class_indices
@@ -320,8 +320,6 @@ submission = pd.concat([df_image, df_preds], axis=1).reset_index(drop=True)
 submission.to_csv(str(submission_path) + f'\\efficient-net-{model_name}-baseline-{version}-450.csv', index=False)
 
 
-
-
 # prediction on test set
 file_list = sorted([f for f in listdir(test_images) if (isfile(join(test_images, f)) and (f.endswith('.jpg')))])
 df_test = pd.DataFrame(columns=['image', 'path'])
@@ -340,6 +338,7 @@ no_aug_generator = no_aug_datagen.flow_from_dataframe(
     x_col="path",
     y_col='class',
     target_size=(img_size, img_size),
+    interpolation='bicubic:fixed',
     shuffle=False,
     class_mode='categorical',
     batch_size=batch_size)
@@ -352,7 +351,7 @@ num_steps = int(np.ceil(num_samples / batch_size))
 y_pred_list = []
 
 # make multiple predictions
-num_iterations = 3
+num_iterations = 5
 for i, pred in enumerate(range(num_iterations)):
     y_pred = model.predict_generator(test_generator, steps=num_steps)
     y_pred_list.append(y_pred)
@@ -367,4 +366,4 @@ images = [f.rstrip('.jpg') for f in file_list]
 df_image = pd.DataFrame(file_list, columns=['image'])
 df_preds = pd.DataFrame(predictions, columns=classes)
 submission = pd.concat([df_image, df_preds], axis=1).reset_index(drop=True)
-submission.to_csv(str(submission_path) + f'\\efficient-net-{model_name}-baseline-{version}-no-augment-450.csv', index=False)
+submission.to_csv(str(submission_path) + f'\\efficient-net-{model_name}-baseline-{version}-no-augment-450-crop.csv', index=False)
