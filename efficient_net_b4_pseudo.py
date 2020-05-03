@@ -1,5 +1,4 @@
 import math
-import numpy as np
 import pandas as pd
 import tensorflow as tf
 import efficientnet.tfkeras as efn
@@ -12,7 +11,7 @@ import keras_preprocessing.image
 import tensorflow.keras.preprocessing.image
 
 # augmentations
-from augment import solarize, posterize, contrast, color, brightness, sharpness, cutout
+from archive.augment import contrast, color, sharpness, cutout
 from PIL import Image
 
 from os import listdir
@@ -64,14 +63,14 @@ for skin_class in classes:
 
     # take subset
     down_sampling = True
-    num_samples = 6000
+    num_samples = 4000
     if down_sampling:
         if len(data_frame) > num_samples:
             data_frame = data_frame.sample(n=num_samples, random_state=123)
 
     tables.append(data_frame)
 
-    if skin_class != 'NV':
+    if skin_class not in ['NV', 'MEL']:
         pseudo = ensemble.loc[ensemble[skin_class] >= 0.65]
         pseudo = pseudo[['image']]
         pseudo['path'] = str(test_images) + '\\' + pseudo['image']
@@ -112,7 +111,7 @@ keras_preprocessing.image.iterator.load_img = load_and_crop_image
 tensorflow.keras.preprocessing.image.load_img = load_and_crop_image
 
 # learning rate
-learning_rate = 0.5e-5  # smaller learning rate
+learning_rate = 1.0e-5  # smaller learning rate
 
 # loading pre-trained EfficientNetB3
 base = efn.EfficientNetB4(weights='imagenet', include_top=False, input_shape=(img_size, img_size, channels))
@@ -244,7 +243,7 @@ for i in range(20):
 history = model.fit(
     train_generator,
     steps_per_epoch=train_steps,
-    epochs=35,
+    epochs=28,
     shuffle=True,
     callbacks=[lr_scheduler],
     class_weight=None,
@@ -275,7 +274,6 @@ plt.ylabel('Categorical Cross-entropy')
 plt.xlabel('Epoch')
 plt.legend(['Train', 'Valid'], loc='upper left')
 plt.show()
-
 
 # prediction on test set
 file_list = sorted([f for f in listdir(test_images) if (isfile(join(test_images, f)) and (f.endswith('.jpg')))])
@@ -366,4 +364,5 @@ images = [f.rstrip('.jpg') for f in file_list]
 df_image = pd.DataFrame(file_list, columns=['image'])
 df_preds = pd.DataFrame(predictions, columns=classes)
 submission = pd.concat([df_image, df_preds], axis=1).reset_index(drop=True)
-submission.to_csv(str(submission_path) + f'\\efficient-net-{model_name}-baseline-{version}-no-augment-450-crop.csv', index=False)
+submission.to_csv(
+    str(submission_path) + f'\\efficient-net-{model_name}-baseline-{version}-no-augment-450-crop.csv', index=False)

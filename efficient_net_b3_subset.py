@@ -1,5 +1,4 @@
 import math
-import numpy as np
 import pandas as pd
 import tensorflow as tf
 import efficientnet.tfkeras as efn
@@ -12,7 +11,7 @@ import keras_preprocessing.image
 import tensorflow.keras.preprocessing.image
 
 # augmentations
-from augment import solarize, posterize, contrast, color, brightness, sharpness, cutout
+from archive.augment import contrast, color, sharpness, cutout
 from PIL import Image
 
 from os import listdir

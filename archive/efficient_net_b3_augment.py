@@ -1,5 +1,4 @@
 import math
-import numpy as np
 import pandas as pd
 import tensorflow as tf
 import efficientnet.tfkeras as efn
@@ -12,8 +11,7 @@ import keras_preprocessing.image
 import tensorflow.keras.preprocessing.image
 
 # augmentations
-from augment import solarize, posterize, contrast, color, brightness, sharpness, cutout
-from augment import shear_x, shear_y
+from archive.augment import contrast, color, sharpness, cutout
 from PIL import Image
 
 from os import listdir
@@ -34,7 +32,7 @@ print(device_lib.list_local_devices())
 
 # settings
 model_name = 'b3'
-version = 'v1-augment-224'
+version = 'v2-augment'
 
 # plotting settings
 sns.set_style('whitegrid')
@@ -81,9 +79,9 @@ class_weights_list = class_weight.compute_class_weight(
 class_weights = {v: k for v, k in enumerate(class_weights_list)}
 
 # specify input
-img_size = 224
+img_size = 300
 channels = 3
-batch_size = 12
+batch_size = 4
 train_steps = math.ceil(len(df_train) / batch_size)
 valid_steps = math.ceil(len(df_valid) / batch_size)
 
@@ -92,14 +90,14 @@ keras_preprocessing.image.iterator.load_img = load_and_crop_image
 tensorflow.keras.preprocessing.image.load_img = load_and_crop_image
 
 # learning rate
-learning_rate = 5e-6
+learning_rate = 1.2e-5
 
 # loading pre-trained EfficientNetB3
 base = efn.EfficientNetB3(weights='imagenet', include_top=False, input_shape=(img_size, img_size, channels))
 model = Sequential()
 model.add(base)
 model.add(GlobalAveragePooling2D(name='gap'))
-model.add(Dropout(0.4, name='dropout_out'))
+model.add(Dropout(0.3, name='dropout_out'))
 model.add(Dense(num_classes, activation='softmax'))
 model.trainable = True
 
@@ -133,11 +131,10 @@ def augment_image(img):
         img = contrast(img, np.random.randint(0, 10))
 
     # color
-    if np.random.rand() >= 0.4:
+    if np.random.rand() >= 0.6:
         img = color(img, np.random.randint(0, 10))
 
     # sharpen
-    img = sharpness(img, 9)
     if np.random.rand() >= 0.6:
         img = sharpness(img, np.random.randint(0, 10))
 
@@ -158,9 +155,6 @@ train_datagen = ImageDataGenerator(
     rotation_range=360,
     vertical_flip=True,
     horizontal_flip=True,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    shear_range=10.0,
     preprocessing_function=augment_image,
     fill_mode='reflect')
 
@@ -170,9 +164,7 @@ valid_datagen = ImageDataGenerator(
     rotation_range=360,
     vertical_flip=True,
     horizontal_flip=True,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    shear_range=10.0,
+    preprocessing_function=augment_image,
     fill_mode='reflect')
 
 train_generator = train_datagen.flow_from_dataframe(
@@ -223,7 +215,6 @@ for i in range(20):
     image = image.astype('uint8')
     plt.imshow(image, vmin=0, vmax=255)
     plt.show()
-
 
 history = model.fit(
     train_generator,
@@ -285,7 +276,7 @@ num_steps = int(np.ceil(num_samples / batch_size))
 y_pred_list = []
 
 # make multiple predictions
-num_iterations = 30
+num_iterations = 25
 for i, pred in enumerate(range(num_iterations)):
     y_pred = model.predict_generator(test_generator, steps=num_steps)
     y_pred_list.append(y_pred)

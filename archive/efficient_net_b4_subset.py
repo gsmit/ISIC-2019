@@ -1,5 +1,4 @@
 import math
-import numpy as np
 import pandas as pd
 import tensorflow as tf
 import efficientnet.tfkeras as efn
@@ -12,7 +11,7 @@ import keras_preprocessing.image
 import tensorflow.keras.preprocessing.image
 
 # augmentations
-from augment import solarize, posterize, contrast, color, brightness, sharpness, cutout
+from archive.augment import contrast, color, sharpness, cutout
 from PIL import Image
 
 from os import listdir
@@ -33,7 +32,7 @@ print(device_lib.list_local_devices())
 
 # settings
 model_name = 'b4'
-version = 'v1-subset'
+version = 'v2-augment'
 
 # plotting settings
 sns.set_style('whitegrid')
@@ -63,7 +62,7 @@ for skin_class in classes:
     num_samples = 4000
     if down_sampling:
         if len(data_frame) > num_samples:
-            data_frame = data_frame.sample(n=num_samples, random_state=96)
+            data_frame = data_frame.sample(n=num_samples, random_state=7)
 
     tables.append(data_frame)
 
@@ -78,7 +77,7 @@ train_labels = pd.concat([train_labels, class_dummies.reindex(train_labels.index
 # validation split
 X_train, X_valid, y_train, y_valid = train_test_split(
     train_labels[['path', 'class']], train_labels[classes],
-    stratify=train_labels['class'].values, shuffle=True, test_size=0.15, random_state=96)
+    stratify=train_labels['class'].values, shuffle=True, test_size=0.2, random_state=7)
 df_train = pd.concat([X_train, y_train], axis=1).reset_index(drop=True)
 df_valid = pd.concat([X_valid, y_valid], axis=1).reset_index(drop=True)
 y_train, y_valid = y_train.values, y_valid.values
@@ -90,7 +89,7 @@ class_weights_list = class_weight.compute_class_weight(
 class_weights = {v: k for v, k in enumerate(class_weights_list)}
 
 # specify input
-img_size = 320  # 380
+img_size = 380  # 380
 channels = 3
 batch_size = 4
 train_steps = math.ceil(len(df_train) / batch_size)
@@ -101,7 +100,7 @@ keras_preprocessing.image.iterator.load_img = load_and_crop_image
 tensorflow.keras.preprocessing.image.load_img = load_and_crop_image
 
 # learning rate
-learning_rate = 0.8e-5
+learning_rate = 1.0e-5
 
 # loading pre-trained EfficientNetB3
 base = efn.EfficientNetB4(weights='imagenet', include_top=False, input_shape=(img_size, img_size, channels))
